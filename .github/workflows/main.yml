@@ -1,0 +1,56 @@
+
+name: Build JERSSON VPN APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Preparar Android SDK
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
+          fi
+          yes | "$SDKMANAGER" --licenses || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Descomprimir proyecto
+        run: |
+          ZIP=$(find . -maxdepth 1 -iname "JERSSON_VPN_Starter_Android.zip" -print -quit)
+          if [ -z "$ZIP" ]; then
+            echo "No se encontró el archivo ZIP"
+            exit 1
+          fi
+          mkdir -p source
+          unzip -q "$ZIP" -d source
+
+      - name: Compilar APK
+        run: gradle -p source assembleDebug
+
+      - name: Publicar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: JERSSON-VPN-APK
+          path: source/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
