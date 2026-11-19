@@ -44,6 +44,37 @@ jobs:
           fi
           mkdir -p source
           unzip -q "$ZIP" -d source
+          
+      - name: Corregir compatibilidad Java y Kotlin
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("source/app/build.gradle.kts")
+          s = p.read_text()
+
+          block = """compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }"""
+
+          if re.search(r'compileOptions\s*\{', s):
+              s = re.sub(r'compileOptions\s*\{[^}]*\}', block, s, count=1)
+          else:
+              s, count = re.subn(
+                  r'(android\s*\{)',
+                  lambda m: m.group(1) + "\n    " + block + "\n",
+                  s,
+                  count=1
+              )
+              if count == 0:
+                  raise SystemExit("No se encontró el bloque android")
+
+          p.write_text(s)
+          print("Compatibilidad Java configurada en 17")
+          PY
+
 
       - name: Compilar APK
         run: gradle -p source assembleDebug
